@@ -13,8 +13,8 @@
       --bg-card: #ffffff;
       --text-main: #111827;
       --text-muted: #6b7280;
-      --accent: #2563eb;      /* puntos */
-      --trend: #ef4444;       /* línea tendencia */
+      --accent: #2563eb;      
+      --trend: #ef4444;       
       --grid: #e5e7eb;
     }
 
@@ -59,10 +59,21 @@
       margin-bottom: 8px;
     }
 
+    /* 📌 CONTENEDOR centrado del gráfico */
     #chart {
       width: 100%;
       height: 70vh;
       min-height: 320px;
+
+      display: flex;
+      justify-content: center;   /* centrado horizontal */
+      align-items: center;       /* centrado vertical */
+    }
+
+    /* 📌 El gráfico real se pinta AQUÍ dentro */
+    #chart_inner {
+      width: 100%;
+      height: 100%;
     }
 
     @media (max-width: 600px) {
@@ -78,7 +89,13 @@
     <div class="card">
       <h1 id="titulo">Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
-      <div id="chart"></div>
+
+      <!-- CONTENEDOR centrador -->
+      <div id="chart">
+        <!-- Aquí dentro se dibuja el gráfico -->
+        <div id="chart_inner"></div>
+      </div>
+
     </div>
   </div>
 
@@ -92,15 +109,15 @@
       const r = await fetch(url);
       const json = await r.json();
 
-      const header = json.header;   // ["Fecha","Valor"]
-      const data   = json.data;     // [["2025/05/07",320], ...]
+      const header = json.header;
+      const data   = json.data;
       const subtitulo = json.subtitulo || "";
       const ejeY = json.ejeY || header[1];
 
       document.getElementById("subtitulo").innerText = subtitulo;
 
       if (!data || data.length === 0) {
-        document.getElementById('chart').innerText = "Sin datos.";
+        document.getElementById('chart_inner').innerText = "Sin datos.";
         return;
       }
 
@@ -130,21 +147,19 @@
           top: 30,
           bottom: 60
         },
-hAxis: {
-  title: header[0],
-  format: 'yyyy/MM/dd',          // mantenemos el formato
-  textStyle: { fontSize: 11, color: '#4b5563' },
-  titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
+        hAxis: {
+          title: header[0],
+          format: 'yyyy/MM/dd',
+          textStyle: { fontSize: 11, color: '#4b5563' },
+          titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
 
-  // 👇 menos marcas = menos fechas en el eje
-  gridlines: {
-    color: '#e5e7eb',
-    count: 5           // prueba con 4–6 según lo que te guste
-  },
+          gridlines: {
+            color: '#e5e7eb',
+            count: 5
+          },
 
-  // sin etiquetas inclinadas
-  slantedText: false
-},
+          slantedText: false
+        },
         vAxis: {
           title: ejeY,
           viewWindow: { min: min - margin, max: max + margin },
@@ -167,8 +182,9 @@ hAxis: {
       };
 
       const chart = new google.visualization.ScatterChart(
-        document.getElementById("chart")
+        document.getElementById("chart_inner")   // ← AQUÍ
       );
+
       chart.draw(dt, options);
     }
   </script>
