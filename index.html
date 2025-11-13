@@ -130,16 +130,21 @@
           top: 30,
           bottom: 60
         },
-        hAxis: {
+hAxis: {
   title: header[0],
-  // sin 'format' → usa el formato de fecha por defecto (el que tenías antes)
+  format: 'yyyy/MM/dd',          // mantenemos el formato
   textStyle: { fontSize: 11, color: '#4b5563' },
   titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-  gridlines: { color: '#e5e7eb' },
+
+  // 👇 menos marcas = menos fechas en el eje
+  gridlines: {
+    color: '#e5e7eb',
+    count: 5           // prueba con 4–6 según lo que te guste
+  },
+
+  // sin etiquetas inclinadas
   slantedText: false
 },
-
-        },
         vAxis: {
           title: ejeY,
           viewWindow: { min: min - margin, max: max + margin },
@@ -169,5 +174,6 @@
   </script>
 </body>
 </html>
+
 
 
