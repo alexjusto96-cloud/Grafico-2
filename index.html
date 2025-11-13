@@ -10,15 +10,26 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
+      text-align: center; /* Centra título y subtítulo */
     }
-    /* El gráfico ocupa toda la ventana */
+
     #chart {
       width: 100%;
-      height: 100vh;
+      height: 90vh;
+      margin-top: 10px;
+    }
+
+    h1, h2 {
+      margin: 0;
+      padding: 5px 0;
     }
   </style>
 </head>
+
 <body>
+
+  <h1 id="titulo">Evolución del rendimiento</h1>
+  <h2 id="subtitulo"></h2>
 
   <div id="chart"></div>
 
@@ -27,60 +38,61 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
-      // URL del Apps Script que devuelve datos
+
       const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
 
       const r = await fetch(url);
-      const json = await r.json(); // {header:..., data:...}
+      const json = await r.json();
 
-      const header = json.header;  // ["Fecha", "Valor"]
-      const data   = json.data;    // [["2025/05/07", 320], ...]
+      const header = json.header;
+      const data   = json.data;
+
+      // --- NUEVO: subtítulo desde C22 ---
+      document.getElementById("subtitulo").innerText = json.subtitulo || "";
 
       if (!data || data.length === 0) {
         document.getElementById('chart').innerText = "Sin datos.";
         return;
       }
 
-      // Construir DataTable para Google Charts
       const dt = new google.visualization.DataTable();
-      dt.addColumn('date',   header[0]);
+      dt.addColumn('date', header[0]);
       dt.addColumn('number', header[1]);
 
-      // Convertimos YYYY/MM/DD → Date()
       const rows = data.map(row => {
-        const parts = row[0].split("/");   // [yyyy, mm, dd]
-        const fecha = new Date(parts[0], parts[1] - 1, parts[2]); // mes empieza en 0
-        return [fecha, Number(row[1])];
+        const p = row[0].split("/");
+        return [new Date(p[0], p[1] - 1, p[2]), Number(row[1])];
       });
 
       dt.addRows(rows);
 
-      // Calcular min y max para margen
-      const vals   = rows.map(x => x[1]);
-      const min    = Math.min(...vals);
-      const max    = Math.max(...vals);
-      const margen = (max - min) * 0.1 || 1;
+      const vals = rows.map(r => r[1]);
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const margin = (max - min) * 0.1 || 1;
 
       const options = {
-        title: "Evolución del rendimiento",
+        title: "",     // Título lo ponemos fuera con <h1>
         legend: { position: "none" },
         hAxis: {
           title: header[0],
           format: 'yyyy/MM/dd'
         },
+
+        // --- NUEVO: nombre eje Y = C23 ---
         vAxis: {
-          title: header[1],
-          viewWindow: { min: min - margen, max: max + margen }
+          title: json.ejeY || header[1],
+          viewWindow: { min: min - margin, max: max + margin }
         },
+
         trendlines: {
           0: { type: 'linear', visibleInLegend: true }
         }
       };
 
-      const chart = new google.visualization.ScatterChart(
-        document.getElementById('chart')
-      );
-      chart.draw(dt, options);
+      new google.visualization.ScatterChart(
+        document.getElementById("chart")
+      ).draw(dt, options);
     }
   </script>
 
