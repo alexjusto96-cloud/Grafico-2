@@ -1,81 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>Gráfico rendimiento</title>
+  <meta charset="utf-8">
+  <title>Gráfico rendimiento</title>
 
-<script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
 
-<style>
-  body { margin:0; font-family: Arial; }
-  #chart { width:100%; height:50vh; }
-  #table { width:100%; height:50vh; overflow:auto; }
-  table { border-collapse: collapse; width:100%; }
-  th, td { border:1px solid #ccc; padding:4px; text-align:center; }
-  th { background:#eee; position:sticky; top:0; }
-</style>
-
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    /* El gráfico ocupa toda la ventana */
+    #chart {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
 </head>
 <body>
 
-<div id="chart"></div>
-<div id="table"></div>
+  <div id="chart"></div>
 
-<script>
-google.charts.load('current', {packages: ['corechart']});
-google.charts.setOnLoadCallback(init);
+  <script>
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(init);
 
-async function init() {
+    async function init() {
+      // URL del Apps Script que devuelve datos
+      const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
 
-  // URL del Apps Script que devuelve datos
-  const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
+      const r = await fetch(url);
+      const json = await r.json(); // {header:..., data:...}
 
-  const r = await fetch(url);
-  const json = await r.json(); // {header:..., data:...}
+      const header = json.header;  // ["Fecha", "Valor"]
+      const data   = json.data;    // [["2025/05/07", 320], ...]
 
-  const header = json.header;
-  const data = json.data;
+      if (!data || data.length === 0) {
+        document.getElementById('chart').innerText = "Sin datos.";
+        return;
+      }
 
-  // Construir DataTable para Google Charts
-  const dt = new google.visualization.DataTable();
-  dt.addColumn('string', header[0]);
-  dt.addColumn('number', header[1]);
-  dt.addRows(data);
+      // Construir DataTable para Google Charts
+      const dt = new google.visualization.DataTable();
+      dt.addColumn('date',   header[0]);
+      dt.addColumn('number', header[1]);
 
-  // Calcular min y max para margen
-  let vals = data.map(x => x[1]);
-  let min = Math.min(...vals);
-  let max = Math.max(...vals);
-  let margen = (max - min) * 0.1 || 1;
+      // Convertimos YYYY/MM/DD → Date()
+      const rows = data.map(row => {
+        const parts = row[0].split("/");   // [yyyy, mm, dd]
+        const fecha = new Date(parts[0], parts[1] - 1, parts[2]); // mes empieza en 0
+        return [fecha, Number(row[1])];
+      });
 
-  const options = {
-    title: "Evolución del rendimiento",
-    legend: { position: "none" },
-    hAxis: { title: header[0] },
-    vAxis: {
-      title: header[1],
-      viewWindow: { min: min - margen, max: max + margen }
-    },
-    trendlines: {
-      0: { type: 'linear', visibleInLegend: true }
+      dt.addRows(rows);
+
+      // Calcular min y max para margen
+      const vals   = rows.map(x => x[1]);
+      const min    = Math.min(...vals);
+      const max    = Math.max(...vals);
+      const margen = (max - min) * 0.1 || 1;
+
+      const options = {
+        title: "Evolución del rendimiento",
+        legend: { position: "none" },
+        hAxis: {
+          title: header[0],
+          format: 'yyyy/MM/dd'
+        },
+        vAxis: {
+          title: header[1],
+          viewWindow: { min: min - margen, max: max + margen }
+        },
+        trendlines: {
+          0: { type: 'linear', visibleInLegend: true }
+        }
+      };
+
+      const chart = new google.visualization.ScatterChart(
+        document.getElementById('chart')
+      );
+      chart.draw(dt, options);
     }
-  };
-
-  const chart = new google.visualization.ScatterChart(
-    document.getElementById('chart')
-  );
-  chart.draw(dt, options);
-
-  // TABLA HTML
-  const tableDiv = document.getElementById("table");
-  let html = `<table><thead><tr><th>${header[0]}</th><th>${header[1]}</th></tr></thead><tbody>`;
-  data.forEach(row => {
-    html += `<tr><td>${row[0]}</td><td>${row[1]}</td></tr>`;
-  });
-  html += "</tbody></table>";
-  tableDiv.innerHTML = html;
-}
-</script>
+  </script>
 
 </body>
 </html>
