@@ -28,7 +28,7 @@ google.charts.setOnLoadCallback(init);
 async function init() {
 
   // URL del Apps Script que devuelve datos
-  const url = "AQUÍ_PONES_TU_URL_DEL_EXEC";
+  const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
 
   const r = await fetch(url);
   const json = await r.json(); // {header:..., data:...}
@@ -79,4 +79,5 @@ async function init() {
 
 </body>
 </html>
+
 
