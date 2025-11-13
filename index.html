@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Gráfico rendimiento</title>
+
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+
+<style>
+  body { margin:0; font-family: Arial; }
+  #chart { width:100%; height:50vh; }
+  #table { width:100%; height:50vh; overflow:auto; }
+  table { border-collapse: collapse; width:100%; }
+  th, td { border:1px solid #ccc; padding:4px; text-align:center; }
+  th { background:#eee; position:sticky; top:0; }
+</style>
+
+</head>
+<body>
+
+<div id="chart"></div>
+<div id="table"></div>
+
+<script>
+google.charts.load('current', {packages: ['corechart']});
+google.charts.setOnLoadCallback(init);
+
+async function init() {
+
+  // URL del Apps Script que devuelve datos
+  const url = "AQUÍ_PONES_TU_URL_DEL_EXEC";
+
+  const r = await fetch(url);
+  const json = await r.json(); // {header:..., data:...}
+
+  const header = json.header;
+  const data = json.data;
+
+  // Construir DataTable para Google Charts
+  const dt = new google.visualization.DataTable();
+  dt.addColumn('string', header[0]);
+  dt.addColumn('number', header[1]);
+  dt.addRows(data);
+
+  // Calcular min y max para margen
+  let vals = data.map(x => x[1]);
+  let min = Math.min(...vals);
+  let max = Math.max(...vals);
+  let margen = (max - min) * 0.1 || 1;
+
+  const options = {
+    title: "Evolución del rendimiento",
+    legend: { position: "none" },
+    hAxis: { title: header[0] },
+    vAxis: {
+      title: header[1],
+      viewWindow: { min: min - margen, max: max + margen }
+    },
+    trendlines: {
+      0: { type: 'linear', visibleInLegend: true }
+    }
+  };
+
+  const chart = new google.visualization.ScatterChart(
+    document.getElementById('chart')
+  );
+  chart.draw(dt, options);
+
+  // TABLA HTML
+  const tableDiv = document.getElementById("table");
+  let html = `<table><thead><tr><th>${header[0]}</th><th>${header[1]}</th></tr></thead><tbody>`;
+  data.forEach(row => {
+    html += `<tr><td>${row[0]}</td><td>${row[1]}</td></tr>`;
+  });
+  html += "</tbody></table>";
+  tableDiv.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
+
