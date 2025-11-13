@@ -131,13 +131,14 @@
           bottom: 60
         },
         hAxis: {
-          title: header[0],
-          format: 'yyyy/MM/dd',
-          textStyle: { fontSize: 11, color: '#4b5563' },
-          titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-          gridlines: { color: '#e5e7eb' },
-          slantedText: true,
-          slantedTextAngle: 35
+  title: header[0],
+  // sin 'format' → usa el formato de fecha por defecto (el que tenías antes)
+  textStyle: { fontSize: 11, color: '#4b5563' },
+  titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
+  gridlines: { color: '#e5e7eb' },
+  slantedText: false
+},
+
         },
         vAxis: {
           title: ejeY,
@@ -168,4 +169,5 @@
   </script>
 </body>
 </html>
+
 
