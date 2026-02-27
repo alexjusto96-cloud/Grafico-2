@@ -7,14 +7,58 @@
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
   <style>
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,sans-serif; background:#f5f7fb; display:flex; justify-content:center; }
-    .wrapper { width:100%; max-width:1000px; padding:16px; box-sizing:border-box; }
-    .card { background:#fff; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.08); padding:16px 16px 8px 16px; }
-    h1,h2 { margin:0; text-align:center; }
-    h1 { font-size:1.6rem; font-weight:700; }
-    h2 { font-size:1rem; font-weight:500; color:#6b7280; margin-top:4px; margin-bottom:6px; }
-    #debug { text-align:center; color:#6b7280; font-size:12px; margin-bottom:8px; word-break:break-word; }
-    #chart { width:100%; height:70vh; min-height:320px; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+      color: #111827;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      padding: 16px 16px 8px 16px;
+    }
+
+    h1, h2 {
+      margin: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #6b7280;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    #chart {
+      width: 100%;
+      height: 70vh;
+      min-height: 320px;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.3rem; }
+      h2 { font-size: 0.9rem; }
+      #chart { height: 65vh; }
+    }
   </style>
 </head>
 
@@ -23,7 +67,6 @@
     <div class="card">
       <h1>Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
-      <div id="debug"></div>
       <div id="chart"></div>
     </div>
   </div>
@@ -33,12 +76,12 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
-      // ⚠️ ESTA URL tiene que ser la del deployment que devuelve 3 columnas en data
-      // header: ["Fecha","Performance","Context (Kg/HR)"]
-      const baseUrl = "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
+      const baseUrl =
+        "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
 
       // rompe caché
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
+
       const r = await fetch(url, { cache: "no-store" });
       const json = await r.json();
 
@@ -47,26 +90,24 @@
 
       document.getElementById("subtitulo").innerText = json.subtitulo || "";
 
-      // Debug base: qué llega
-      const fila0 = data.length ? data[0] : null;
-      document.getElementById("debug").innerText =
-        "header=" + JSON.stringify(header) + " | fila0=" + JSON.stringify(fila0);
-
       if (!data.length) {
         document.getElementById("chart").innerText = "Sin datos.";
         return;
       }
 
-      // ✅ Si no llega Y2, no hay nada que “leer”
-      if (!Array.isArray(fila0) || fila0.length < 3) {
+      if (!Array.isArray(data[0]) || data[0].length < 3) {
         document.getElementById("chart").innerText =
-          "El endpoint que estás llamando SOLO devuelve 1 serie (no llega la 3ª columna). Cambia la URL del fetch al deployment que devuelva [fecha, y1, y2].";
+          "El endpoint no está devolviendo 3 columnas [fecha, y1, y2].";
         return;
       }
 
-      // A partir de aquí: lectura por ÍNDICE (0,1,2)
-      const ejeY1 = json.ejeY  || header[1] || "Y1";
-      const ejeY2 = json.ejeY2 || header[2] || "Y2";
+      // Nombres de ejes (sin debug)
+      const ejeY1 = json.ejeY  || header[1] || "Performance";
+      const ejeY2 = json.ejeY2 || header[2] || "Context";
+
+      // Punto de color para títulos (●)
+      const BLUE_DOT = " \u25CF";
+      const RED_DOT  = " \u25CF";
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
@@ -74,7 +115,7 @@
       dt.addColumn('number', header[2] || "Context");
 
       const rows = data.map(row => {
-        const p = String(row[0]).split("/");
+        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
         const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
         const y1p = parseFloat(String(row[1]).replace(",", "."));
@@ -89,6 +130,7 @@
 
       dt.addRows(rows);
 
+      // rangos por eje
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
@@ -97,15 +139,20 @@
       const y2min = Math.min(...y2vals);
       const y2max = Math.max(...y2vals);
 
-      const y1margin = Math.max((y1max - y1min) * 0.1, 1);
+      // margen 10%
+      const y1range = y1max - y1min;
+      const y2range = y2max - y2min;
 
-      document.getElementById("debug").innerText +=
-        " | y2min=" + y2min + " | y2max=" + y2max;
+      const y1margin = y1range !== 0 ? y1range * 0.1 : (Math.abs(y1max) || 1) * 0.1;
+      const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
 
       const options = {
         backgroundColor: 'transparent',
-        legend: { position: "bottom" },
-        chartArea: { left: 70, right: 70, top: 30, bottom: 60 },
+
+        // ✅ quitar leyenda inferior
+        legend: { position: "none" },
+
+        chartArea: { left: 80, right: 80, top: 30, bottom: 60 },
 
         hAxis: {
           title: header[0] || "Fecha",
@@ -116,29 +163,35 @@
 
         vAxes: {
           0: {
-            title: ejeY1,
+            // ✅ texto + punto azul
+            title: ejeY1 + BLUE_DOT,
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
             gridlines: { color: '#e5e7eb' },
-            baselineColor: '#d1d5db'
+            baselineColor: '#d1d5db',
+            titleTextStyle: { color: '#2563eb', italic: false }
           },
           1: {
-            title: ejeY2,
-            // EXACTO: rango real de Context
-            viewWindow: { min: y2min, max: y2max },
+            // ✅ texto + punto rojo
+            title: ejeY2 + RED_DOT,
+            viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
             gridlines: { color: 'transparent' },
-            baselineColor: 'transparent'
+            baselineColor: 'transparent',
+            titleTextStyle: { color: '#ef4444', italic: false }
           }
         },
 
         seriesType: 'scatter',
+
         series: {
+          // Performance: puntos azules
           0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
+          // Context: puntos rojos
           1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
         },
 
-        // trendline SOLO para serie 0
+        // ✅ Trendline SOLO para Performance (serie 0)
         trendlines: {
-          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.8, visibleInLegend: false }
+          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.85, visibleInLegend: false }
         },
 
         tooltip: { trigger: 'both' }
@@ -150,4 +203,5 @@
   </script>
 </body>
 </html>
+
 
