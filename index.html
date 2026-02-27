@@ -24,30 +24,11 @@
     h1,h2{margin:0;text-align:center;}
     h1{font-size:1.6rem;font-weight:700;}
     h2{font-size:1rem;font-weight:500;color:#6b7280;margin-top:4px;margin-bottom:8px;}
-
-    /* contenedor relativo para poder overlay */
-    #chart-wrap{
-      position:relative;
-      width:100%;
-      height:70vh;
-      min-height:320px;
-    }
-    #chart{width:100%;height:100%;}
-
-    /* puntitos overlay */
-    .axis-dot{
-      position:absolute;
-      width:10px;height:10px;border-radius:50%;
-      pointer-events:none;
-      box-shadow:0 0 0 2px rgba(255,255,255,.9); /* para que se vea sobre la gráfica */
-      opacity:.95;
-      display:none; /* se activa cuando el chart esté listo */
-    }
-
+    #chart{width:100%;height:70vh;min-height:320px;}
     @media (max-width:600px){
       h1{font-size:1.3rem;}
       h2{font-size:.9rem;}
-      #chart-wrap{height:65vh;}
+      #chart{height:65vh;}
     }
   </style>
 </head>
@@ -57,12 +38,7 @@
     <div class="card">
       <h1>Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
-
-      <div id="chart-wrap">
-        <div id="chart"></div>
-        <div id="dot-y1" class="axis-dot" style="background:#2563eb;"></div>
-        <div id="dot-y2" class="axis-dot" style="background:#ef4444;"></div>
-      </div>
+      <div id="chart"></div>
     </div>
   </div>
 
@@ -91,8 +67,8 @@
         return;
       }
 
-      const ejeY1 = json.ejeY  || header[1] || "Y1";
-      const ejeY2 = json.ejeY2 || header[2] || "Y2";
+      const ejeY1 = (json.ejeY  || header[1] || "Y1").toString();
+      const ejeY2 = (json.ejeY2 || header[2] || "Y2").toString();
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
@@ -118,10 +94,8 @@
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
-      const y1min = Math.min(...y1vals);
-      const y1max = Math.max(...y1vals);
-      const y2min = Math.min(...y2vals);
-      const y2max = Math.max(...y2vals);
+      const y1min = Math.min(...y1vals), y1max = Math.max(...y1vals);
+      const y2min = Math.min(...y2vals), y2max = Math.max(...y2vals);
 
       const y1range = y1max - y1min;
       const y2range = y2max - y2min;
@@ -144,14 +118,14 @@
 
         vAxes: {
           0: {
-            title: ejeY1, // ✅ solo texto negro
+            title: ejeY1,                 // ✅ solo texto negro
             titleTextStyle: { color: "#111827", italic: false },
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
             gridlines: { color: "#e5e7eb" },
             baselineColor: "#d1d5db"
           },
           1: {
-            title: ejeY2, // ✅ solo texto negro
+            title: ejeY2,                 // ✅ solo texto negro
             titleTextStyle: { color: "#111827", italic: false },
             viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
             gridlines: { color: "transparent" },
@@ -175,40 +149,59 @@
 
       const chart = new google.visualization.ComboChart(document.getElementById("chart"));
 
-      function placeDots() {
-        const cli = chart.getChartLayoutInterface();
-        const box = cli.getChartAreaBoundingBox(); // {left, top, width, height}
+      function addDotAfterAxisTitle(titleText, colorHex) {
+        const container = document.getElementById("chart");
+        const svg = container.querySelector("svg");
+        if (!svg) return;
 
-        const wrap = document.getElementById("chart-wrap");
-        const dotY1 = document.getElementById("dot-y1");
-        const dotY2 = document.getElementById("dot-y2");
+        // borrar dots previos (en redraw/resize)
+        svg.querySelectorAll('circle.axis-title-dot').forEach(n => n.remove());
 
-        // Centro vertical aproximado del área del chart
-        const cy = box.top + box.height / 2;
+        const texts = Array.from(svg.querySelectorAll("text"));
 
-        // Ajustes finos (px): pon el punto “cerca” del título del eje
-        const leftX  = box.left - 55;              // a la izquierda del chartArea
-        const rightX = box.left + box.width + 55;  // a la derecha del chartArea
+        // buscamos el <text> cuyo contenido sea exactamente el título
+        const t = texts.find(el => (el.textContent || "").trim() === titleText.trim());
+        if (!t) return;
 
-        dotY1.style.left = leftX + "px";
-        dotY1.style.top  = cy + "px";
+        // bbox del texto (en coordenadas del SVG)
+        const bb = t.getBBox();
 
-        dotY2.style.left = rightX + "px";
-        dotY2.style.top  = cy + "px";
+        // crear círculo SVG
+        const NS = "http://www.w3.org/2000/svg";
+        const c = document.createElementNS(NS, "circle");
+        c.classList.add("axis-title-dot");
+        c.setAttribute("r", "4.5");
+        c.setAttribute("fill", colorHex);
+        c.setAttribute("opacity", "0.95");
 
-        dotY1.style.display = "block";
-        dotY2.style.display = "block";
+        // colocarlo "después" del texto: al final del bbox + padding
+        const padding = 10;
+        const cx = bb.x + bb.width + padding;
+        const cy = bb.y + bb.height / 2;
+
+        c.setAttribute("cx", String(cx));
+        c.setAttribute("cy", String(cy));
+
+        // IMPORTANTE: meterlo en el mismo grupo padre para heredar transforms (rotación del título)
+        (t.parentNode || svg).appendChild(c);
       }
 
-      google.visualization.events.addListener(chart, "ready", placeDots);
-      window.addEventListener("resize", () => {
-        chart.draw(dt, options);
-      });
+      function onReady() {
+        // Añadir puntos al final del título (misma línea)
+        addDotAfterAxisTitle(ejeY1, BLUE);
+        addDotAfterAxisTitle(ejeY2, RED);
+      }
+
+      google.visualization.events.addListener(chart, "ready", onReady);
+
+      // Redibujar en resize manteniendo dots
+      window.addEventListener("resize", () => chart.draw(dt, options));
 
       chart.draw(dt, options);
     }
   </script>
 </body>
 </html>
+
 
 
