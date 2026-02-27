@@ -13,8 +13,6 @@
       --bg-card: #ffffff;
       --text-main: #111827;
       --text-muted: #6b7280;
-      --accent: #2563eb;
-      --trend: #ef4444;
       --grid: #e5e7eb;
     }
 
@@ -59,18 +57,15 @@
       margin-bottom: 8px;
     }
 
-    /* 📌 CONTENEDOR centrado del gráfico */
     #chart {
       width: 100%;
       height: 70vh;
       min-height: 320px;
-
       display: flex;
-      justify-content: center;   /* centrado horizontal */
-      align-items: center;       /* centrado vertical */
+      justify-content: center;
+      align-items: center;
     }
 
-    /* 📌 El gráfico real se pinta AQUÍ dentro */
     #chart_inner {
       width: 100%;
       height: 100%;
@@ -87,131 +82,172 @@
 <body>
   <div class="wrapper">
     <div class="card">
-      <h1 id="titulo">Evolución del rendimiento</h1>
+
+      <h1>Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
 
-      <!-- CONTENEDOR centrador -->
       <div id="chart">
-        <!-- Aquí dentro se dibuja el gráfico -->
         <div id="chart_inner"></div>
       </div>
 
     </div>
   </div>
 
-  <script>
-    google.charts.load('current', { packages: ['corechart'] });
-    google.charts.setOnLoadCallback(init);
+<script>
 
-    async function init() {
-      const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
+google.charts.load('current', { packages: ['corechart'] });
+google.charts.setOnLoadCallback(init);
 
-      const r = await fetch(url);
-      const json = await r.json();
+async function init() {
 
-      // ✅ Esperamos ahora: header = ["Fecha","Serie 1","Serie 2"]
-      const header = json.header || ["Fecha", "Serie 1", "Serie 2"];
-      const data   = json.data || [];
-      const subtitulo = json.subtitulo || "";
-      const ejeY1 = json.ejeY  || header[1];
-      const ejeY2 = json.ejeY2 || header[2];
+  const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
 
-      document.getElementById("subtitulo").innerText = subtitulo;
+  const r = await fetch(url);
+  const json = await r.json();
 
-      if (!data || data.length === 0) {
-        document.getElementById('chart_inner').innerText = "Sin datos.";
-        return;
+  const header = json.header;
+  const data   = json.data;
+  const subtitulo = json.subtitulo || "";
+  const ejeY1 = json.ejeY;
+  const ejeY2 = json.ejeY2;
+
+  document.getElementById("subtitulo").innerText = subtitulo;
+
+  if (!data || data.length === 0) {
+    document.getElementById("chart_inner").innerText = "Sin datos";
+    return;
+  }
+
+  const dt = new google.visualization.DataTable();
+
+  dt.addColumn('date', header[0]);
+  dt.addColumn('number', header[1]); // Performance
+  dt.addColumn('number', header[2]); // Context
+
+  const rows = data.map(row => {
+
+    const p = row[0].split("/");
+
+    return [
+      new Date(p[0], p[1]-1, p[2]),
+      row[1],
+      row[2]
+    ];
+
+  });
+
+  dt.addRows(rows);
+
+
+  // rangos independientes
+  const y1vals = rows.map(r => r[1]).filter(v => v != null);
+  const y2vals = rows.map(r => r[2]).filter(v => v != null);
+
+  const y1min = Math.min(...y1vals);
+  const y1max = Math.max(...y1vals);
+
+  const y2min = Math.min(...y2vals);
+  const y2max = Math.max(...y2vals);
+
+  const options = {
+
+    backgroundColor: 'transparent',
+
+    legend: {
+      position: "bottom"
+    },
+
+    chartArea: {
+      left: 70,
+      right: 70,
+      top: 30,
+      bottom: 60
+    },
+
+    hAxis: {
+      title: header[0],
+      format: 'yyyy/MM/dd',
+      gridlines: { color: '#e5e7eb' }
+    },
+
+    vAxes: {
+
+      0: {
+        title: ejeY1,
+        viewWindow: {
+          min: y1min - (y1max-y1min)*0.1,
+          max: y1max + (y1max-y1min)*0.1
+        }
+      },
+
+      1: {
+        title: ejeY2,
+        viewWindow: {
+          min: y2min - (y2max-y2min)*0.1,
+          max: y2max + (y2max-y2min)*0.1
+        },
+        gridlines: { color: 'transparent' }
       }
 
-      const dt = new google.visualization.DataTable();
-      dt.addColumn('date', header[0]);
-      dt.addColumn('number', header[1]); // eje izq
-      dt.addColumn('number', header[2]); // eje der
+    },
 
-      const rows = data.map(row => {
-        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
-        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
-        const y1 = (row[1] == null || row[1] === "") ? null : Number(String(row[1]).replace(",", "."));
-        const y2 = (row[2] == null || row[2] === "") ? null : Number(String(row[2]).replace(",", "."));
-        return [d, y1, y2];
-      });
 
-      dt.addRows(rows);
+    // SERIES
+    series: {
 
-      // Rangos separados (para que cada eje escale con su serie)
-      const y1vals = rows.map(r => r[1]).filter(v => v != null && !Number.isNaN(v));
-      const y2vals = rows.map(r => r[2]).filter(v => v != null && !Number.isNaN(v));
+      // Performance
+      0: {
+        targetAxisIndex: 0,
+        color: '#2563eb',
+        pointSize: 7,
+        lineWidth: 0
+      },
 
-      const y1min = y1vals.length ? Math.min(...y1vals) : 0;
-      const y1max = y1vals.length ? Math.max(...y1vals) : 1;
-      const y1margin = (y1max - y1min) * 0.1 || 1;
+      // Context
+      1: {
+        targetAxisIndex: 1,
+        color: '#ef4444',
+        pointSize: 7,
+        lineWidth: 0
+      }
 
-      const y2min = y2vals.length ? Math.min(...y2vals) : 0;
-      const y2max = y2vals.length ? Math.max(...y2vals) : 1;
-      const y2margin = (y2max - y2min) * 0.1 || 1;
+    },
 
-      const options = {
-        title: "",
-        backgroundColor: 'transparent',
-        legend: { position: "bottom" },
 
-        chartArea: {
-          left: 70,
-          right: 70,  // ✅ espacio para el eje derecho
-          top: 30,
-          bottom: 60
-        },
+    // tendencia SOLO performance
+    trendlines: {
 
-        hAxis: {
-          title: header[0],
-          format: 'yyyy/MM/dd',
-          textStyle: { fontSize: 11, color: '#4b5563' },
-          titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-          gridlines: { color: '#e5e7eb', count: 5 },
-          slantedText: false
-        },
+      0: {
+        type: 'linear',
+        color: '#2563eb',
+        lineWidth: 2,
+        opacity: 0.8,
+        visibleInLegend: false
+      }
 
-        // ✅ Dos ejes verticales
-        vAxes: {
-          0: {
-            title: ejeY1,
-            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            textStyle: { fontSize: 11, color: '#4b5563' },
-            titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-            gridlines: { color: '#e5e7eb' },
-            baselineColor: '#d1d5db'
-          },
-          1: {
-            title: ejeY2,
-            viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
-            textStyle: { fontSize: 11, color: '#4b5563' },
-            titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-            gridlines: { color: 'transparent' }, // evita rejilla duplicada
-            baselineColor: '#d1d5db'
-          }
-        },
+    },
 
-        // ✅ Solo puntos rojos, sin trendline
-        series: {
-          0: { targetAxisIndex: 0, color: '#ef4444', pointSize: 6, lineWidth: 0 },
-          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 6, lineWidth: 0 }
-        },
-
-        // ✅ Quita las líneas de tendencia
-        trendlines: {},
-
-        tooltip: { trigger: 'both' }
-      };
-
-      const chart = new google.visualization.ScatterChart(
-        document.getElementById("chart_inner")
-      );
-
-      chart.draw(dt, options);
+    tooltip: {
+      trigger: 'both'
     }
-  </script>
+
+  };
+
+
+  const chart =
+    new google.visualization.ScatterChart(
+      document.getElementById("chart_inner")
+    );
+
+  chart.draw(dt, options);
+
+}
+
+</script>
+
 </body>
 </html>
+
 
 
 
