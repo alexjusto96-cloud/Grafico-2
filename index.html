@@ -36,6 +36,9 @@
       font-size: 12px;
       margin-bottom: 8px;
       word-break: break-word;
+      background: #fdfdfd;
+      padding: 4px;
+      border-radius: 4px;
     }
 
     #chart { width: 100%; height: 70vh; min-height: 320px; }
@@ -57,119 +60,117 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
-
-      const baseUrl =
-        "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
-
-      // ✅ rompe caché SIEMPRE
+      const baseUrl = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
 
-      const r = await fetch(url, { cache: "no-store" });
-      const json = await r.json();
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        const json = await r.json();
 
-      const header = json.header || ["Fecha","Performance","Context (Kg/HR)"];
-      const data   = json.data   || [];
-      const subtitulo = json.subtitulo || "";
-      const ejeY1 = json.ejeY  || header[1];
-      const ejeY2 = json.ejeY2 || header[2];
+        const header = json.header || ["Fecha","Performance","Context (Kg/HR)"];
+        const data   = json.data   || [];
+        const subtitulo = json.subtitulo || "";
+        const ejeY1 = json.ejeY  || header[1];
+        const ejeY2 = json.ejeY2 || header[2];
 
-      document.getElementById("subtitulo").innerText = subtitulo;
+        document.getElementById("subtitulo").innerText = subtitulo;
 
-      if (!data.length) {
-        document.getElementById("chart").innerText = "Sin datos.";
-        document.getElementById("debug").innerText = "data vacía";
-        return;
-      }
+        if (!data.length) {
+          document.getElementById("chart").innerText = "Sin datos.";
+          document.getElementById("debug").innerText = "data vacía";
+          return;
+        }
 
-      const dt = new google.visualization.DataTable();
-      dt.addColumn('date', header[0]);
-      dt.addColumn('number', header[1]); // Performance
-      dt.addColumn('number', header[2]); // Context
+        const dt = new google.visualization.DataTable();
+        dt.addColumn('date', header[0]);
+        dt.addColumn('number', header[1]); // Performance
+        dt.addColumn('number', header[2]); // Context
 
-      // ✅ Parseo robusto (fila puede venir con 2 o 3 columnas)
-      const rows = data.map(row => {
-        const p = String(row[0]).split("/");
-        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+        // Parseo robusto
+        const rows = data.map(row => {
+          const p = String(row[0]).split("/");
+          const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
-        const y1p = parseFloat(String(row[1]).replace(",", "."));
-        const y2p = (row.length >= 3) ? parseFloat(String(row[2]).replace(",", ".")) : NaN;
+          const y1p = parseFloat(String(row[1]).replace(",", "."));
+          const y2p = (row.length >= 3) ? parseFloat(String(row[2]).replace(",", ".")) : NaN;
 
-        return [
-          d,
-          Number.isFinite(y1p) ? y1p : null,
-          Number.isFinite(y2p) ? y2p : null
-        ];
-      });
+          return [
+            d,
+            Number.isFinite(y1p) ? y1p : null,
+            Number.isFinite(y2p) ? y2p : null
+          ];
+        });
 
-      dt.addRows(rows);
+        dt.addRows(rows);
 
-      // Rangos por eje (solo valores válidos)
-      const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
-      const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
+        // Rangos por eje
+        const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
+        const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
-      const y1min = y1vals.length ? Math.min(...y1vals) : 0;
-      const y1max = y1vals.length ? Math.max(...y1vals) : 1;
+        const y1min = y1vals.length ? Math.min(...y1vals) : 0;
+        const y1max = y1vals.length ? Math.max(...y1vals) : 1;
 
-      // ✅ si y2vals está vacío, el debug lo va a cantar
-      const y2min = y2vals.length ? Math.min(...y2vals) : 0;
-      const y2max = y2vals.length ? Math.max(...y2vals) : 1;
+        const y2min = y2vals.length ? Math.min(...y2vals) : 0;
+        const y2max = y2vals.length ? Math.max(...y2vals) : 1;
 
-      const y1margin = Math.max((y1max - y1min) * 0.1, 1);
+        // Margen inteligente para que los puntos no toquen el borde superior/inferior
+        const y1margin = Math.max((y1max - y1min) * 0.1, 2);
+        const y2margin = Math.max((y2max - y2min) * 0.1, 2);
 
-      // ✅ debug en pantalla
-      document.getElementById("debug").innerText =
-        "header=" + JSON.stringify(header) +
-        " | fila0=" + JSON.stringify(data[0]) +
-        " | y2vals=" + y2vals.length +
-        " | y2min=" + (y2vals.length ? y2min : "NA") +
-        " | y2max=" + (y2vals.length ? y2max : "NA");
+        // Debug actualizado
+        document.getElementById("debug").innerText = 
+          "Fila0 Y1: " + rows[0][1] + 
+          " | Y2: " + rows[0][2] + 
+          " | Y2 Rango: [" + y2min + " a " + y2max + "]";
 
-      const options = {
-        backgroundColor: 'transparent',
-        legend: { position: "bottom" },
+        const options = {
+          backgroundColor: 'transparent',
+          legend: { position: "bottom" },
+          chartArea: { left: 70, right: 70, top: 30, bottom: 60 },
 
-        chartArea: { left: 70, right: 70, top: 30, bottom: 60 },
-
-        hAxis: {
-          title: header[0],
-          format: 'yyyy/MM/dd',
-          gridlines: { color: '#e5e7eb', count: 5 },
-          slantedText: false
-        },
-
-        vAxes: {
-          0: {
-            title: ejeY1,
-            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            gridlines: { color: '#e5e7eb' },
-            baselineColor: '#d1d5db'
+          hAxis: {
+            title: header[0],
+            format: 'yyyy/MM/dd',
+            gridlines: { color: '#e5e7eb', count: 5 }
           },
-          1: {
-            title: ejeY2,
-            // ✅ EXACTO min/max reales (si existen)
-            viewWindow: { min: y2min, max: y2max },
-            gridlines: { color: 'transparent' },
-            baselineColor: 'transparent'
-          }
-        },
 
-        // ✅ ComboChart estable con doble eje
-        seriesType: 'scatter',
-        series: {
-          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
-          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
-        },
+          vAxes: {
+            0: {
+              title: ejeY1,
+              viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
+              gridlines: { color: '#e5e7eb' },
+              titleTextStyle: { color: '#2563eb', bold: true },
+              textStyle: { color: '#2563eb' }
+            },
+            1: {
+              title: ejeY2,
+              // Forzamos el rango con margen para que Y2 no sea una línea pegada arriba o abajo
+              viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
+              gridlines: { color: 'transparent' },
+              titleTextStyle: { color: '#ef4444', bold: true },
+              textStyle: { color: '#ef4444' }
+            }
+          },
 
-        // ✅ Trendline solo para Performance
-        trendlines: {
-          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.8, visibleInLegend: false }
-        },
+          seriesType: 'scatter',
+          series: {
+            0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
+            1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
+          },
 
-        tooltip: { trigger: 'both' }
-      };
+          trendlines: {
+            0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.5, visibleInLegend: false }
+          },
 
-      const chart = new google.visualization.ComboChart(document.getElementById("chart"));
-      chart.draw(dt, options);
+          tooltip: { trigger: 'both' }
+        };
+
+        const chart = new google.visualization.ComboChart(document.getElementById("chart"));
+        chart.draw(dt, options);
+
+      } catch (error) {
+        document.getElementById("debug").innerText = "Error: " + error.message;
+      }
     }
   </script>
 </body>
