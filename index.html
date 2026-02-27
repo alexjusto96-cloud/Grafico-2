@@ -7,28 +7,57 @@
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
   <style>
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background:#f5f7fb;
-      display:flex;
-      justify-content:center;
-      color:#111827;
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+      color: #111827;
     }
-    .wrapper{width:100%;max-width:1000px;padding:16px;box-sizing:border-box;}
-    .card{
-      background:#fff;border-radius:16px;
-      box-shadow:0 10px 25px rgba(15,23,42,.08);
-      padding:16px 16px 8px 16px;
+
+    .wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px;
+      box-sizing: border-box;
     }
-    h1,h2{margin:0;text-align:center;}
-    h1{font-size:1.6rem;font-weight:700;}
-    h2{font-size:1rem;font-weight:500;color:#6b7280;margin-top:4px;margin-bottom:8px;}
-    #chart{width:100%;height:70vh;min-height:320px;}
-    @media (max-width:600px){
-      h1{font-size:1.3rem;}
-      h2{font-size:.9rem;}
-      #chart{height:65vh;}
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      padding: 16px 16px 8px 16px;
+    }
+
+    h1, h2 {
+      margin: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #6b7280;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    #chart {
+      width: 100%;
+      height: 70vh;
+      min-height: 320px;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.3rem; }
+      h2 { font-size: 0.9rem; }
+      #chart { height: 65vh; }
     }
   </style>
 </head>
@@ -47,11 +76,10 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
-      const BLUE = "#2563eb";
-      const RED  = "#ef4444";
-
       const baseUrl =
         "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
+
+      // rompe caché
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
 
       const r = await fetch(url, { cache: "no-store" });
@@ -62,21 +90,32 @@
 
       document.getElementById("subtitulo").innerText = json.subtitulo || "";
 
-      if (!data.length || !Array.isArray(data[0]) || data[0].length < 3) {
-        document.getElementById("chart").innerText = "Sin datos o formato incorrecto [fecha,y1,y2].";
+      if (!data.length) {
+        document.getElementById("chart").innerText = "Sin datos.";
         return;
       }
 
-      const ejeY1 = (json.ejeY  || header[1] || "Y1").toString();
-      const ejeY2 = (json.ejeY2 || header[2] || "Y2").toString();
+      if (!Array.isArray(data[0]) || data[0].length < 3) {
+        document.getElementById("chart").innerText =
+          "El endpoint no está devolviendo 3 columnas [fecha, y1, y2].";
+        return;
+      }
+
+      // Nombres de ejes (sin debug)
+      const ejeY1 = json.ejeY  || header[1] || "Performance";
+      const ejeY2 = json.ejeY2 || header[2] || "Context";
+
+      // Punto de color para títulos (●)
+      const BLUE_DOT = " \u25CF";
+      const RED_DOT  = " \u25CF";
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
-      dt.addColumn('number', header[1] || "Y1");
-      dt.addColumn('number', header[2] || "Y2");
+      dt.addColumn('number', header[1] || "Performance");
+      dt.addColumn('number', header[2] || "Context");
 
       const rows = data.map(row => {
-        const p = String(row[0]).split("/"); // yyyy/MM/dd
+        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
         const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
         const y1p = parseFloat(String(row[1]).replace(",", "."));
@@ -91,117 +130,77 @@
 
       dt.addRows(rows);
 
+      // rangos por eje
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
-      const y1min = Math.min(...y1vals), y1max = Math.max(...y1vals);
-      const y2min = Math.min(...y2vals), y2max = Math.max(...y2vals);
+      const y1min = Math.min(...y1vals);
+      const y1max = Math.max(...y1vals);
+      const y2min = Math.min(...y2vals);
+      const y2max = Math.max(...y2vals);
 
+      // margen 10%
       const y1range = y1max - y1min;
       const y2range = y2max - y2min;
 
-      // ✅ 10% margen (si rango=0, usa 10% del valor o 1)
       const y1margin = y1range !== 0 ? y1range * 0.1 : (Math.abs(y1max) || 1) * 0.1;
       const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
 
       const options = {
-        backgroundColor: "transparent",
+        backgroundColor: 'transparent',
+
+        // ✅ quitar leyenda inferior
         legend: { position: "none" },
-        chartArea: { left: 85, right: 85, top: 30, bottom: 60 },
+
+        chartArea: { left: 80, right: 80, top: 30, bottom: 60 },
 
         hAxis: {
           title: header[0] || "Fecha",
-          format: "yyyy/MM/dd",
-          gridlines: { color: "#e5e7eb", count: 5 },
+          format: 'yyyy/MM/dd',
+          gridlines: { color: '#e5e7eb', count: 5 },
           slantedText: false
         },
 
         vAxes: {
           0: {
-            title: ejeY1,                 // ✅ solo texto negro
-            titleTextStyle: { color: "#111827", italic: false },
+            // ✅ texto + punto azul
+            title: ejeY1 + BLUE_DOT,
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            gridlines: { color: "#e5e7eb" },
-            baselineColor: "#d1d5db"
+            gridlines: { color: '#e5e7eb' },
+            baselineColor: '#d1d5db',
+            titleTextStyle: { color: '#2563eb', italic: false }
           },
           1: {
-            title: ejeY2,                 // ✅ solo texto negro
-            titleTextStyle: { color: "#111827", italic: false },
+            // ✅ texto + punto rojo
+            title: ejeY2 + RED_DOT,
             viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
-            gridlines: { color: "transparent" },
-            baselineColor: "transparent"
+            gridlines: { color: 'transparent' },
+            baselineColor: 'transparent',
+            titleTextStyle: { color: '#ef4444', italic: false }
           }
         },
 
-        seriesType: "scatter",
+        seriesType: 'scatter',
+
         series: {
-          0: { targetAxisIndex: 0, color: BLUE, pointSize: 7 },
-          1: { targetAxisIndex: 1, color: RED,  pointSize: 7 }
+          // Performance: puntos azules
+          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
+          // Context: puntos rojos
+          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
         },
 
-        // ✅ trendline SOLO para Performance (serie 0) y azul
+        // ✅ Trendline SOLO para Performance (serie 0)
         trendlines: {
-          0: { type: "linear", color: BLUE, lineWidth: 2, opacity: 0.85, visibleInLegend: false }
+          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.85, visibleInLegend: false }
         },
 
-        tooltip: { trigger: "both" }
+        tooltip: { trigger: 'both' }
       };
 
       const chart = new google.visualization.ComboChart(document.getElementById("chart"));
-
-      function addDotAfterAxisTitle(titleText, colorHex) {
-        const container = document.getElementById("chart");
-        const svg = container.querySelector("svg");
-        if (!svg) return;
-
-        // borrar dots previos (en redraw/resize)
-        svg.querySelectorAll('circle.axis-title-dot').forEach(n => n.remove());
-
-        const texts = Array.from(svg.querySelectorAll("text"));
-
-        // buscamos el <text> cuyo contenido sea exactamente el título
-        const t = texts.find(el => (el.textContent || "").trim() === titleText.trim());
-        if (!t) return;
-
-        // bbox del texto (en coordenadas del SVG)
-        const bb = t.getBBox();
-
-        // crear círculo SVG
-        const NS = "http://www.w3.org/2000/svg";
-        const c = document.createElementNS(NS, "circle");
-        c.classList.add("axis-title-dot");
-        c.setAttribute("r", "4.5");
-        c.setAttribute("fill", colorHex);
-        c.setAttribute("opacity", "0.95");
-
-        // colocarlo "después" del texto: al final del bbox + padding
-        const padding = 10;
-        const cx = bb.x + bb.width + padding;
-        const cy = bb.y + bb.height / 2;
-
-        c.setAttribute("cx", String(cx));
-        c.setAttribute("cy", String(cy));
-
-        // IMPORTANTE: meterlo en el mismo grupo padre para heredar transforms (rotación del título)
-        (t.parentNode || svg).appendChild(c);
-      }
-
-      function onReady() {
-        // Añadir puntos al final del título (misma línea)
-        addDotAfterAxisTitle(ejeY1, BLUE);
-        addDotAfterAxisTitle(ejeY2, RED);
-      }
-
-      google.visualization.events.addListener(chart, "ready", onReady);
-
-      // Redibujar en resize manteniendo dots
-      window.addEventListener("resize", () => chart.draw(dt, options));
-
       chart.draw(dt, options);
     }
   </script>
 </body>
 </html>
-
-
 
