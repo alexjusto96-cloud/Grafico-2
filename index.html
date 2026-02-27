@@ -7,29 +7,29 @@
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
   <style>
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-      background:#f5f7fb;
-      display:flex;
-      justify-content:center;
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
     }
-    .wrapper{
-      width:100%;
-      max-width:1000px;
-      padding:16px;
-      box-sizing:border-box;
+    .wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px;
+      box-sizing: border-box;
     }
-    .card{
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 10px 25px rgba(0,0,0,0.08);
-      padding:16px 16px 8px 16px;
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      padding: 16px 16px 8px 16px;
     }
-    h1,h2{margin:0;text-align:center;}
-    h1{font-size:1.6rem;font-weight:700;}
-    h2{font-size:1rem;font-weight:500;color:#6b7280;margin-top:4px;margin-bottom:8px;}
-    #chart{width:100%;height:70vh;min-height:320px;}
+    h1, h2 { margin: 0; text-align: center; }
+    h1 { font-size: 1.6rem; font-weight: 700; }
+    h2 { font-size: 1rem; font-weight: 500; color: #6b7280; margin-top: 4px; margin-bottom: 8px; }
+    #chart { width: 100%; height: 70vh; min-height: 320px; }
   </style>
 </head>
 
@@ -69,29 +69,34 @@
       dt.addColumn('number', header[1]); // Performance
       dt.addColumn('number', header[2]); // Context
 
+      // Parseo robusto: NaN -> null
       const rows = data.map(row => {
         const p = String(row[0]).split("/");
         const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
-        const y1 = (row[1] == null || row[1] === "") ? null : Number(String(row[1]).replace(",", "."));
-        const y2 = (row[2] == null || row[2] === "") ? null : Number(String(row[2]).replace(",", "."));
+        const y1p = parseFloat(String(row[1]).replace(",", "."));
+        const y2p = parseFloat(String(row[2]).replace(",", "."));
 
-        return [d, Number.isFinite(y1) ? y1 : null, Number.isFinite(y2) ? y2 : null];
+        const y1 = Number.isFinite(y1p) ? y1p : null;
+        const y2 = Number.isFinite(y2p) ? y2p : null;
+
+        return [d, y1, y2];
       });
 
       dt.addRows(rows);
 
-      // Rangos por eje (solo con valores válidos)
+      // Rangos por eje (solo valores válidos)
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
       const y1min = y1vals.length ? Math.min(...y1vals) : 0;
       const y1max = y1vals.length ? Math.max(...y1vals) : 1;
+
       const y2min = y2vals.length ? Math.min(...y2vals) : 0;
       const y2max = y2vals.length ? Math.max(...y2vals) : 1;
 
+      // margen solo para Y1; Y2 exacto (min/max reales)
       const y1margin = Math.max((y1max - y1min) * 0.1, 1);
-      const y2margin = Math.max((y2max - y2min) * 0.1, 1);
 
       const options = {
         backgroundColor: 'transparent',
@@ -110,23 +115,29 @@
           0: {
             title: ejeY1,
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            gridlines: { color: '#e5e7eb' }
+            gridlines: { color: '#e5e7eb' },
+            baselineColor: '#d1d5db'
           },
           1: {
             title: ejeY2,
-            viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
-            gridlines: { color: 'transparent' }
+            // ✅ EXACTO: min/max reales de Context
+            viewWindow: { min: y2min, max: y2max },
+            gridlines: { color: 'transparent' },
+            // ✅ quita la línea del 0 en el eje derecho
+            baselineColor: 'transparent'
           }
         },
 
-        // IMPORTANTE: ComboChart con ambos como scatter
+        // ComboChart para que el doble eje sea estable
         seriesType: 'scatter',
         series: {
+          // Performance: puntos azules
           0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
+          // Context: puntos rojos
           1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
         },
 
-        // SOLO tendencia para Performance (serie 0)
+        // Trendline SOLO para Performance (serie 0)
         trendlines: {
           0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.8, visibleInLegend: false }
         },
@@ -140,7 +151,6 @@
   </script>
 </body>
 </html>
-
 
 
 
