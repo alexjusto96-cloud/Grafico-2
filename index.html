@@ -1,52 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Gráfico rendimiento</title>
+<meta charset="utf-8">
+<title>Gráfico rendimiento</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://www.gstatic.com/charts/loader.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-      background: #f5f7fb;
-      display: flex;
-      justify-content: center;
-    }
+<style>
 
-    .wrapper {
-      width: 100%;
-      max-width: 1000px;
-      padding: 16px;
-    }
+body{
+margin:0;
+font-family:system-ui,-apple-system,Segoe UI,sans-serif;
+background:#f5f7fb;
+display:flex;
+justify-content:center;
+}
 
-    .card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-      padding: 16px;
-    }
+.wrapper{
+width:100%;
+max-width:1000px;
+padding:16px;
+}
 
-    h1,h2 {
-      text-align: center;
-      margin: 0;
-    }
+.card{
+background:white;
+border-radius:16px;
+box-shadow:0 10px 25px rgba(0,0,0,0.08);
+padding:16px;
+}
 
-    h2 {
-      color: #6b7280;
-      margin-top: 4px;
-      margin-bottom: 10px;
-    }
+h1,h2{
+text-align:center;
+margin:0;
+}
 
-    #chart {
-      height: 70vh;
-      min-height: 320px;
-    }
+h2{
+color:#6b7280;
+margin-top:4px;
+margin-bottom:10px;
+}
 
-  </style>
+#chart{
+height:70vh;
+min-height:320px;
+}
+
+</style>
+
 </head>
 
 <body>
@@ -68,44 +70,75 @@
 <script>
 
 google.charts.load('current',{packages:['corechart']});
+
 google.charts.setOnLoadCallback(init);
+
 
 async function init(){
 
 const url =
 "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
 
+
 const r = await fetch(url);
 
 const json = await r.json();
 
+
 const header = json.header;
+
 const data   = json.data;
 
 document.getElementById("subtitulo").innerText =
 json.subtitulo || "";
 
 
-const dt = new google.visualization.DataTable();
-
-dt.addColumn('date', header[0]);
-dt.addColumn('number', header[1]); // Performance
-dt.addColumn('number', header[2]); // Context
+const dt =
+new google.visualization.DataTable();
 
 
-const rows = data.map(row=>{
+dt.addColumn('date',header[0]);
 
-const p = row[0].split("/");
+dt.addColumn('number',header[1]); // Performance
 
-return [
+dt.addColumn('number',header[2]); // Context
 
-new Date(p[0],p[1]-1,p[2]),
 
-Number(row[1]),
 
-Number(row[2])
+// ===== PARSEO ROBUSTO =====
 
-];
+const rows =
+data.map(row=>{
+
+const p =
+String(row[0]).split("/");
+
+
+const fecha =
+new Date(
+Number(p[0]),
+Number(p[1])-1,
+Number(p[2])
+);
+
+
+const perf =
+row[1]===null||row[1]==="" ?
+null :
+parseFloat(
+String(row[1]).replace(",",".")
+);
+
+
+const context =
+row[2]===null||row[2]==="" ?
+null :
+parseFloat(
+String(row[2]).replace(",",".")
+);
+
+
+return [fecha,perf,context];
 
 });
 
@@ -113,22 +146,31 @@ Number(row[2])
 dt.addRows(rows);
 
 
-// ============================
-// calcular rangos seguros
-// ============================
+// ===== RANGOS SEGUROS =====
 
 const y1vals =
-rows.map(r=>r[1]).filter(v=>!isNaN(v));
+rows
+.map(r=>r[1])
+.filter(v=>v!==null&&!isNaN(v));
+
 
 const y2vals =
-rows.map(r=>r[2]).filter(v=>!isNaN(v));
+rows
+.map(r=>r[2])
+.filter(v=>v!==null&&!isNaN(v));
 
 
-const y1min = Math.min(...y1vals);
-const y1max = Math.max(...y1vals);
+const y1min =
+Math.min(...y1vals);
 
-const y2min = Math.min(...y2vals);
-const y2max = Math.max(...y2vals);
+const y1max =
+Math.max(...y1vals);
+
+const y2min =
+Math.min(...y2vals);
+
+const y2max =
+Math.max(...y2vals);
 
 
 const y1margin =
@@ -138,11 +180,10 @@ const y2margin =
 Math.max((y2max-y2min)*0.1,1);
 
 
-// ============================
-// opciones gráfico
-// ============================
 
-const options = {
+// ===== OPCIONES =====
+
+const options={
 
 backgroundColor:'transparent',
 
@@ -183,7 +224,7 @@ gridlines:{color:'transparent'}
 },
 
 
-// series
+// SERIES
 
 series:{
 
@@ -204,7 +245,7 @@ lineWidth:0
 },
 
 
-// trendline solo performance
+// TRENDLINE SOLO PERFORMANCE
 
 trendlines:{
 
@@ -223,9 +264,7 @@ tooltip:{trigger:'both'}
 };
 
 
-// ============================
-// dibujar
-// ============================
+// ===== DIBUJAR =====
 
 const chart =
 new google.visualization.ScatterChart(
@@ -239,7 +278,9 @@ chart.draw(dt,options);
 </script>
 
 </body>
+
 </html>
+
 
 
 
