@@ -2,23 +2,52 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Gráfico Rendimiento</title>
+  <title>Gráfico rendimiento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/charts/loader.js"></script>
+
   <style>
-    body { margin: 0; font-family: sans-serif; background: #f5f7fb; display: flex; justify-content: center; }
-    .wrapper { width: 100%; max-width: 1000px; padding: 16px; }
-    .card { background: #fff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); padding: 20px; }
-    h1, h2 { text-align: center; margin: 0; }
-    h2 { color: #6b7280; font-size: 1rem; margin-bottom: 10px; }
-    #chart { width: 100%; height: 70vh; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+    }
+    .wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      padding: 16px 16px 8px 16px;
+    }
+    h1, h2 { margin: 0; text-align: center; }
+    h1 { font-size: 1.6rem; font-weight: 700; }
+    h2 { font-size: 1rem; font-weight: 500; color: #6b7280; margin-top: 4px; margin-bottom: 6px; }
+
+    #debug {
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    #chart { width: 100%; height: 70vh; min-height: 320px; }
   </style>
 </head>
+
 <body>
   <div class="wrapper">
     <div class="card">
-      <h1 id="titulo">Evolución del rendimiento</h1>
+      <h1>Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
+      <div id="debug"></div>
       <div id="chart"></div>
     </div>
   </div>
@@ -28,60 +57,115 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
-      const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
-      const r = await fetch(url);
+
+      const baseUrl =
+        "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
+
+      // ✅ rompe caché SIEMPRE
+      const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
+
+      const r = await fetch(url, { cache: "no-store" });
       const json = await r.json();
 
-      const header = json.header || ["Fecha","Performance","Context"];
-      const data = json.data || [];
-      document.getElementById("subtitulo").innerText = json.subtitulo || "";
+      const header = json.header || ["Fecha","Performance","Context (Kg/HR)"];
+      const data   = json.data   || [];
+      const subtitulo = json.subtitulo || "";
+      const ejeY1 = json.ejeY  || header[1];
+      const ejeY2 = json.ejeY2 || header[2];
+
+      document.getElementById("subtitulo").innerText = subtitulo;
+
+      if (!data.length) {
+        document.getElementById("chart").innerText = "Sin datos.";
+        document.getElementById("debug").innerText = "data vacía";
+        return;
+      }
 
       const dt = new google.visualization.DataTable();
-      dt.addColumn('date', 'Fecha');
-      dt.addColumn('number', json.ejeY || header[1]);
-      dt.addColumn('number', json.ejeY2 || header[2]);
+      dt.addColumn('date', header[0]);
+      dt.addColumn('number', header[1]); // Performance
+      dt.addColumn('number', header[2]); // Context
 
+      // ✅ Parseo robusto (fila puede venir con 2 o 3 columnas)
       const rows = data.map(row => {
-        const p = row[0].split("/");
+        const p = String(row[0]).split("/");
+        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+
+        const y1p = parseFloat(String(row[1]).replace(",", "."));
+        const y2p = (row.length >= 3) ? parseFloat(String(row[2]).replace(",", ".")) : NaN;
+
         return [
-          new Date(p[0], p[1]-1, p[2]),
-          parseFloat(String(row[1]).replace(",", ".")),
-          parseFloat(String(row[2]).replace(",", "."))
+          d,
+          Number.isFinite(y1p) ? y1p : null,
+          Number.isFinite(y2p) ? y2p : null
         ];
       });
+
       dt.addRows(rows);
 
-      // --- CÁLCULO DE LÍMITES ESTRICTOS ---
-      const y1Vals = rows.map(r => r[1]);
-      const y2Vals = rows.map(r => r[2]);
-      
-      const min1 = Math.min(...y1Vals);
-      const max1 = Math.max(...y1Vals);
-      const min2 = Math.min(...y2Vals);
-      const max2 = Math.max(...y2Vals);
+      // Rangos por eje (solo valores válidos)
+      const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
+      const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
+
+      const y1min = y1vals.length ? Math.min(...y1vals) : 0;
+      const y1max = y1vals.length ? Math.max(...y1vals) : 1;
+
+      // ✅ si y2vals está vacío, el debug lo va a cantar
+      const y2min = y2vals.length ? Math.min(...y2vals) : 0;
+      const y2max = y2vals.length ? Math.max(...y2vals) : 1;
+
+      const y1margin = Math.max((y1max - y1min) * 0.1, 1);
+
+      // ✅ debug en pantalla
+      document.getElementById("debug").innerText =
+        "header=" + JSON.stringify(header) +
+        " | fila0=" + JSON.stringify(data[0]) +
+        " | y2vals=" + y2vals.length +
+        " | y2min=" + (y2vals.length ? y2min : "NA") +
+        " | y2max=" + (y2vals.length ? y2max : "NA");
 
       const options = {
-        chartArea: { left: 80, right: 80, width: '80%', height: '70%' },
-        series: {
-          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 6 },
-          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 6, type: 'scatter' }
+        backgroundColor: 'transparent',
+        legend: { position: "bottom" },
+
+        chartArea: { left: 70, right: 70, top: 30, bottom: 60 },
+
+        hAxis: {
+          title: header[0],
+          format: 'yyyy/MM/dd',
+          gridlines: { color: '#e5e7eb', count: 5 },
+          slantedText: false
         },
+
         vAxes: {
-          0: { 
-            title: json.ejeY || header[1],
-            viewWindow: { min: min1 - 5, max: max1 + 5 },
-            textStyle: { color: '#2563eb' }
+          0: {
+            title: ejeY1,
+            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
+            gridlines: { color: '#e5e7eb' },
+            baselineColor: '#d1d5db'
           },
-          1: { 
-            title: json.ejeY2 || header[2],
-            viewWindow: { min: min2 - 2, max: max2 + 2 },
+          1: {
+            title: ejeY2,
+            // ✅ EXACTO min/max reales (si existen)
+            viewWindow: { min: y2min, max: y2max },
             gridlines: { color: 'transparent' },
-            textStyle: { color: '#ef4444' }
+            baselineColor: 'transparent'
           }
         },
-        hAxis: { format: 'yyyy/MM/dd', gridlines: { count: 5 } },
-        trendlines: { 0: { type: 'linear', color: '#2563eb', opacity: 0.3 } },
-        legend: { position: 'bottom' }
+
+        // ✅ ComboChart estable con doble eje
+        seriesType: 'scatter',
+        series: {
+          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
+          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
+        },
+
+        // ✅ Trendline solo para Performance
+        trendlines: {
+          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.8, visibleInLegend: false }
+        },
+
+        tooltip: { trigger: 'both' }
       };
 
       const chart = new google.visualization.ComboChart(document.getElementById("chart"));
@@ -90,7 +174,3 @@
   </script>
 </body>
 </html>
-
-
-
-
