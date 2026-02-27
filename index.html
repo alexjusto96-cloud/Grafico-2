@@ -13,8 +13,8 @@
       --bg-card: #ffffff;
       --text-main: #111827;
       --text-muted: #6b7280;
-      --accent: #2563eb;      
-      --trend: #ef4444;       
+      --accent: #2563eb;
+      --trend: #ef4444;
       --grid: #e5e7eb;
     }
 
@@ -109,10 +109,12 @@
       const r = await fetch(url);
       const json = await r.json();
 
-      const header = json.header;
-      const data   = json.data;
+      // ✅ Esperamos ahora: header = ["Fecha","Serie 1","Serie 2"]
+      const header = json.header || ["Fecha", "Serie 1", "Serie 2"];
+      const data   = json.data || [];
       const subtitulo = json.subtitulo || "";
-      const ejeY = json.ejeY || header[1];
+      const ejeY1 = json.ejeY  || header[1];
+      const ejeY2 = json.ejeY2 || header[2];
 
       document.getElementById("subtitulo").innerText = subtitulo;
 
@@ -123,66 +125,86 @@
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0]);
-      dt.addColumn('number', header[1]);
+      dt.addColumn('number', header[1]); // eje izq
+      dt.addColumn('number', header[2]); // eje der
 
       const rows = data.map(row => {
-        const p = row[0].split("/");
-        return [new Date(p[0], p[1] - 1, p[2]), Number(row[1])];
+        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
+        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+        const y1 = (row[1] == null || row[1] === "") ? null : Number(String(row[1]).replace(",", "."));
+        const y2 = (row[2] == null || row[2] === "") ? null : Number(String(row[2]).replace(",", "."));
+        return [d, y1, y2];
       });
 
       dt.addRows(rows);
 
-      const vals = rows.map(r => r[1]);
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const margin = (max - min) * 0.1 || 1;
+      // Rangos separados (para que cada eje escale con su serie)
+      const y1vals = rows.map(r => r[1]).filter(v => v != null && !Number.isNaN(v));
+      const y2vals = rows.map(r => r[2]).filter(v => v != null && !Number.isNaN(v));
+
+      const y1min = y1vals.length ? Math.min(...y1vals) : 0;
+      const y1max = y1vals.length ? Math.max(...y1vals) : 1;
+      const y1margin = (y1max - y1min) * 0.1 || 1;
+
+      const y2min = y2vals.length ? Math.min(...y2vals) : 0;
+      const y2max = y2vals.length ? Math.max(...y2vals) : 1;
+      const y2margin = (y2max - y2min) * 0.1 || 1;
 
       const options = {
         title: "",
         backgroundColor: 'transparent',
-        legend: { position: "none" },
+        legend: { position: "bottom" },
+
         chartArea: {
           left: 70,
-          right: 20,
+          right: 70,  // ✅ espacio para el eje derecho
           top: 30,
           bottom: 60
         },
+
         hAxis: {
           title: header[0],
           format: 'yyyy/MM/dd',
           textStyle: { fontSize: 11, color: '#4b5563' },
           titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-
-          gridlines: {
-            color: '#e5e7eb',
-            count: 5
-          },
-
+          gridlines: { color: '#e5e7eb', count: 5 },
           slantedText: false
         },
-        vAxis: {
-          title: ejeY,
-          viewWindow: { min: min - margin, max: max + margin },
-          textStyle: { fontSize: 11, color: '#4b5563' },
-          titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
-          gridlines: { color: '#e5e7eb' },
-          baselineColor: '#d1d5db'
-        },
-        pointSize: 6,
-        colors: ['#2563eb'],
-        trendlines: {
+
+        // ✅ Dos ejes verticales
+        vAxes: {
           0: {
-            type: 'linear',
-            visibleInLegend: false,
-            color: '#ef4444',
-            lineWidth: 2,
-            opacity: 0.8
+            title: ejeY1,
+            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
+            textStyle: { fontSize: 11, color: '#4b5563' },
+            titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
+            gridlines: { color: '#e5e7eb' },
+            baselineColor: '#d1d5db'
+          },
+          1: {
+            title: ejeY2,
+            viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
+            textStyle: { fontSize: 11, color: '#4b5563' },
+            titleTextStyle: { fontSize: 12, italic: false, color: '#374151' },
+            gridlines: { color: 'transparent' }, // evita rejilla duplicada
+            baselineColor: '#d1d5db'
           }
-        }
+        },
+
+        // ✅ Solo puntos rojos, sin trendline
+        series: {
+          0: { targetAxisIndex: 0, color: '#ef4444', pointSize: 6, lineWidth: 0 },
+          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 6, lineWidth: 0 }
+        },
+
+        // ✅ Quita las líneas de tendencia
+        trendlines: {},
+
+        tooltip: { trigger: 'both' }
       };
 
       const chart = new google.visualization.ScatterChart(
-        document.getElementById("chart_inner")   // ← AQUÍ
+        document.getElementById("chart_inner")
       );
 
       chart.draw(dt, options);
