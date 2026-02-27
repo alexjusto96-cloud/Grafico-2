@@ -77,9 +77,7 @@
 
     async function init() {
       const baseUrl =
-        "https://script.google.com/macros/s/AKfycbwmnGh_eu_-b1tpsBovcLPsMQ2aWz-pwOcxltBU6f1B1-kZvG0HVTLxLQVccLIi80em/exec";
-
-      // rompe caché
+        "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
 
       const r = await fetch(url, { cache: "no-store" });
@@ -94,28 +92,29 @@
         document.getElementById("chart").innerText = "Sin datos.";
         return;
       }
-
       if (!Array.isArray(data[0]) || data[0].length < 3) {
         document.getElementById("chart").innerText =
           "El endpoint no está devolviendo 3 columnas [fecha, y1, y2].";
         return;
       }
 
-      // Nombres de ejes (sin debug)
-      const ejeY1 = json.ejeY  || header[1] || "Performance";
-      const ejeY2 = json.ejeY2 || header[2] || "Context";
+      const ejeY1 = json.ejeY  || header[1] || "Y1";
+      const ejeY2 = json.ejeY2 || header[2] || "Y2";
 
-      // Punto de color para títulos (●)
-      const BLUE_DOT = " \u25CF";
-      const RED_DOT  = " \u25CF";
+      const BLUE = "#2563eb";
+      const RED  = "#ef4444";
+
+      // ✅ TÍTULOS: texto negro + círculo coloreado (HTML)
+      const ejeY1Title = `${escapeHtml(ejeY1)} <span style="color:${BLUE};font-weight:700">●</span>`;
+      const ejeY2Title = `${escapeHtml(ejeY2)} <span style="color:${RED};font-weight:700">●</span>`;
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
-      dt.addColumn('number', header[1] || "Performance");
-      dt.addColumn('number', header[2] || "Context");
+      dt.addColumn('number', header[1] || "Y1");
+      dt.addColumn('number', header[2] || "Y2");
 
       const rows = data.map(row => {
-        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
+        const p = String(row[0]).split("/"); // yyyy/MM/dd
         const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
         const y1p = parseFloat(String(row[1]).replace(",", "."));
@@ -130,7 +129,6 @@
 
       dt.addRows(rows);
 
-      // rangos por eje
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
@@ -139,7 +137,6 @@
       const y2min = Math.min(...y2vals);
       const y2max = Math.max(...y2vals);
 
-      // margen 10%
       const y1range = y1max - y1min;
       const y2range = y2max - y2min;
 
@@ -147,62 +144,61 @@
       const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
 
       const options = {
-        backgroundColor: 'transparent',
-
-        // ✅ quitar leyenda inferior
+        backgroundColor: "transparent",
         legend: { position: "none" },
-
-        chartArea: { left: 80, right: 80, top: 30, bottom: 60 },
+        chartArea: { left: 85, right: 85, top: 30, bottom: 60 },
 
         hAxis: {
           title: header[0] || "Fecha",
-          format: 'yyyy/MM/dd',
-          gridlines: { color: '#e5e7eb', count: 5 },
+          format: "yyyy/MM/dd",
+          gridlines: { color: "#e5e7eb", count: 5 },
           slantedText: false
         },
 
         vAxes: {
           0: {
-            // ✅ texto + punto azul
-            title: ejeY1 + BLUE_DOT,
+            title: ejeY1Title,
+            titleTextStyle: { color: "#111827", italic: false, isHtml: true },
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            gridlines: { color: '#e5e7eb' },
-            baselineColor: '#d1d5db',
-            titleTextStyle: { color: '#2563eb', italic: false }
+            gridlines: { color: "#e5e7eb" },
+            baselineColor: "#d1d5db"
           },
           1: {
-            // ✅ texto + punto rojo
-            title: ejeY2 + RED_DOT,
+            title: ejeY2Title,
+            titleTextStyle: { color: "#111827", italic: false, isHtml: true },
             viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
-            gridlines: { color: 'transparent' },
-            baselineColor: 'transparent',
-            titleTextStyle: { color: '#ef4444', italic: false }
+            gridlines: { color: "transparent" },
+            baselineColor: "transparent"
           }
         },
 
-        seriesType: 'scatter',
-
+        seriesType: "scatter",
         series: {
-          // Performance: puntos azules
-          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
-          // Context: puntos rojos
-          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
+          0: { targetAxisIndex: 0, color: BLUE, pointSize: 7 },
+          1: { targetAxisIndex: 1, color: RED,  pointSize: 7 }
         },
 
-        // ✅ Trendline SOLO para Performance (serie 0)
+        // Trendline SOLO para Performance (serie 0)
         trendlines: {
-          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.85, visibleInLegend: false }
+          0: { type: "linear", color: BLUE, lineWidth: 2, opacity: 0.85, visibleInLegend: false }
         },
 
-        tooltip: { trigger: 'both' }
+        tooltip: { trigger: "both" }
       };
 
       const chart = new google.visualization.ComboChart(document.getElementById("chart"));
       chart.draw(dt, options);
     }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
   </script>
 </body>
 </html>
-
-
 
