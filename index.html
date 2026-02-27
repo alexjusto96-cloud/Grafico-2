@@ -35,7 +35,7 @@
     async function init() {
       // ⚠️ ESTA URL tiene que ser la del deployment que devuelve 3 columnas en data
       // header: ["Fecha","Performance","Context (Kg/HR)"]
-      const baseUrl = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
+      const baseUrl = "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
 
       // rompe caché
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
@@ -150,3 +150,4 @@
   </script>
 </body>
 </html>
+
