@@ -7,57 +7,47 @@
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f7fb;
-      display: flex;
-      justify-content: center;
-      color: #111827;
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:#f5f7fb;
+      display:flex;
+      justify-content:center;
+      color:#111827;
+    }
+    .wrapper{width:100%;max-width:1000px;padding:16px;box-sizing:border-box;}
+    .card{
+      background:#fff;border-radius:16px;
+      box-shadow:0 10px 25px rgba(15,23,42,.08);
+      padding:16px 16px 8px 16px;
+    }
+    h1,h2{margin:0;text-align:center;}
+    h1{font-size:1.6rem;font-weight:700;}
+    h2{font-size:1rem;font-weight:500;color:#6b7280;margin-top:4px;margin-bottom:8px;}
+
+    /* contenedor relativo para poder overlay */
+    #chart-wrap{
+      position:relative;
+      width:100%;
+      height:70vh;
+      min-height:320px;
+    }
+    #chart{width:100%;height:100%;}
+
+    /* puntitos overlay */
+    .axis-dot{
+      position:absolute;
+      width:10px;height:10px;border-radius:50%;
+      pointer-events:none;
+      box-shadow:0 0 0 2px rgba(255,255,255,.9); /* para que se vea sobre la gráfica */
+      opacity:.95;
+      display:none; /* se activa cuando el chart esté listo */
     }
 
-    .wrapper {
-      width: 100%;
-      max-width: 1000px;
-      padding: 16px;
-      box-sizing: border-box;
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-      padding: 16px 16px 8px 16px;
-    }
-
-    h1, h2 {
-      margin: 0;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-    }
-
-    h2 {
-      font-size: 1rem;
-      font-weight: 500;
-      color: #6b7280;
-      margin-top: 4px;
-      margin-bottom: 8px;
-    }
-
-    #chart {
-      width: 100%;
-      height: 70vh;
-      min-height: 320px;
-    }
-
-    @media (max-width: 600px) {
-      h1 { font-size: 1.3rem; }
-      h2 { font-size: 0.9rem; }
-      #chart { height: 65vh; }
+    @media (max-width:600px){
+      h1{font-size:1.3rem;}
+      h2{font-size:.9rem;}
+      #chart-wrap{height:65vh;}
     }
   </style>
 </head>
@@ -67,7 +57,12 @@
     <div class="card">
       <h1>Evolución del rendimiento</h1>
       <h2 id="subtitulo"></h2>
-      <div id="chart"></div>
+
+      <div id="chart-wrap">
+        <div id="chart"></div>
+        <div id="dot-y1" class="axis-dot" style="background:#2563eb;"></div>
+        <div id="dot-y2" class="axis-dot" style="background:#ef4444;"></div>
+      </div>
     </div>
   </div>
 
@@ -76,6 +71,9 @@
     google.charts.setOnLoadCallback(init);
 
     async function init() {
+      const BLUE = "#2563eb";
+      const RED  = "#ef4444";
+
       const baseUrl =
         "https://script.google.com/macros/s/AKfycbybjbc6oV3DiUDsSiIBDw5ptyI1vS2TFC3B2TspAl2UOZhfUADL6DiM-hmIWkl-Pkvd/exec";
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
@@ -88,25 +86,13 @@
 
       document.getElementById("subtitulo").innerText = json.subtitulo || "";
 
-      if (!data.length) {
-        document.getElementById("chart").innerText = "Sin datos.";
-        return;
-      }
-      if (!Array.isArray(data[0]) || data[0].length < 3) {
-        document.getElementById("chart").innerText =
-          "El endpoint no está devolviendo 3 columnas [fecha, y1, y2].";
+      if (!data.length || !Array.isArray(data[0]) || data[0].length < 3) {
+        document.getElementById("chart").innerText = "Sin datos o formato incorrecto [fecha,y1,y2].";
         return;
       }
 
       const ejeY1 = json.ejeY  || header[1] || "Y1";
       const ejeY2 = json.ejeY2 || header[2] || "Y2";
-
-      const BLUE = "#2563eb";
-      const RED  = "#ef4444";
-
-      // ✅ TÍTULOS: texto negro + círculo coloreado (HTML)
-      const ejeY1Title = `${escapeHtml(ejeY1)} <span style="color:${BLUE};font-weight:700">●</span>`;
-      const ejeY2Title = `${escapeHtml(ejeY2)} <span style="color:${RED};font-weight:700">●</span>`;
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
@@ -140,6 +126,7 @@
       const y1range = y1max - y1min;
       const y2range = y2max - y2min;
 
+      // ✅ 10% margen (si rango=0, usa 10% del valor o 1)
       const y1margin = y1range !== 0 ? y1range * 0.1 : (Math.abs(y1max) || 1) * 0.1;
       const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
 
@@ -157,15 +144,15 @@
 
         vAxes: {
           0: {
-            title: ejeY1Title,
-            titleTextStyle: { color: "#111827", italic: false, isHtml: true },
+            title: ejeY1, // ✅ solo texto negro
+            titleTextStyle: { color: "#111827", italic: false },
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
             gridlines: { color: "#e5e7eb" },
             baselineColor: "#d1d5db"
           },
           1: {
-            title: ejeY2Title,
-            titleTextStyle: { color: "#111827", italic: false, isHtml: true },
+            title: ejeY2, // ✅ solo texto negro
+            titleTextStyle: { color: "#111827", italic: false },
             viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
             gridlines: { color: "transparent" },
             baselineColor: "transparent"
@@ -178,7 +165,7 @@
           1: { targetAxisIndex: 1, color: RED,  pointSize: 7 }
         },
 
-        // Trendline SOLO para Performance (serie 0)
+        // ✅ trendline SOLO para Performance (serie 0) y azul
         trendlines: {
           0: { type: "linear", color: BLUE, lineWidth: 2, opacity: 0.85, visibleInLegend: false }
         },
@@ -187,16 +174,38 @@
       };
 
       const chart = new google.visualization.ComboChart(document.getElementById("chart"));
-      chart.draw(dt, options);
-    }
 
-    function escapeHtml(str) {
-      return String(str)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+      function placeDots() {
+        const cli = chart.getChartLayoutInterface();
+        const box = cli.getChartAreaBoundingBox(); // {left, top, width, height}
+
+        const wrap = document.getElementById("chart-wrap");
+        const dotY1 = document.getElementById("dot-y1");
+        const dotY2 = document.getElementById("dot-y2");
+
+        // Centro vertical aproximado del área del chart
+        const cy = box.top + box.height / 2;
+
+        // Ajustes finos (px): pon el punto “cerca” del título del eje
+        const leftX  = box.left - 55;              // a la izquierda del chartArea
+        const rightX = box.left + box.width + 55;  // a la derecha del chartArea
+
+        dotY1.style.left = leftX + "px";
+        dotY1.style.top  = cy + "px";
+
+        dotY2.style.left = rightX + "px";
+        dotY2.style.top  = cy + "px";
+
+        dotY1.style.display = "block";
+        dotY2.style.display = "block";
+      }
+
+      google.visualization.events.addListener(chart, "ready", placeDots);
+      window.addEventListener("resize", () => {
+        chart.draw(dt, options);
+      });
+
+      chart.draw(dt, options);
     }
   </script>
 </body>
