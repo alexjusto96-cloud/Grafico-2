@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Gráfico rendimiento</title>
+  <title>Gráfico Rendimiento y Contexto</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/charts/loader.js"></script>
 
@@ -16,7 +16,7 @@
     }
     .wrapper {
       width: 100%;
-      max-width: 1000px;
+      max-width: 1100px;
       padding: 16px;
       box-sizing: border-box;
     }
@@ -24,12 +24,12 @@
       background: #fff;
       border-radius: 16px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-      padding: 16px 16px 8px 16px;
+      padding: 24px;
     }
     h1, h2 { margin: 0; text-align: center; }
-    h1 { font-size: 1.6rem; font-weight: 700; }
-    h2 { font-size: 1rem; font-weight: 500; color: #6b7280; margin-top: 4px; margin-bottom: 8px; }
-    #chart { width: 100%; height: 70vh; min-height: 320px; }
+    h1 { font-size: 1.6rem; font-weight: 700; color: #1f2937; }
+    h2 { font-size: 1rem; font-weight: 500; color: #6b7280; margin-top: 4px; margin-bottom: 20px; }
+    #chart { width: 100%; height: 75vh; min-height: 400px; }
   </style>
 </head>
 
@@ -48,111 +48,111 @@
 
     async function init() {
       const url = "https://script.google.com/macros/s/AKfycbxMfiseKw7Fh810OIbEPnGrNZa-ZviQ7XYUifrdrk7lxfHdjODFPRzw0QmLehMKnicI/exec";
-      const r = await fetch(url);
-      const json = await r.json();
+      
+      try {
+        const r = await fetch(url);
+        const json = await r.json();
 
-      const header = json.header || ["Fecha","Performance","Context (Kg/HR)"];
-      const data   = json.data   || [];
-      const subtitulo = json.subtitulo || "";
-      const ejeY1 = json.ejeY  || header[1];
-      const ejeY2 = json.ejeY2 || header[2];
+        const header = json.header || ["Fecha","Performance","Context (Kg/HR)"];
+        const data   = json.data   || [];
+        const subtitulo = json.subtitulo || "";
+        const ejeY1 = json.ejeY  || header[1];
+        const ejeY2 = json.ejeY2 || header[2];
 
-      document.getElementById("subtitulo").innerText = subtitulo;
+        document.getElementById("subtitulo").innerText = subtitulo;
 
-      if (!data.length) {
-        document.getElementById("chart").innerText = "Sin datos.";
-        return;
-      }
+        if (!data.length) {
+          document.getElementById("chart").innerText = "Sin datos disponibles.";
+          return;
+        }
 
-      const dt = new google.visualization.DataTable();
-      dt.addColumn('date', header[0]);
-      dt.addColumn('number', header[1]); // Performance
-      dt.addColumn('number', header[2]); // Context
+        const dt = new google.visualization.DataTable();
+        dt.addColumn('date', header[0]);
+        dt.addColumn('number', header[1]); // Eje Izquierdo (Performance)
+        dt.addColumn('number', header[2]); // Eje Derecho (Contexto)
 
-      // Parseo robusto: NaN -> null
-      const rows = data.map(row => {
-        const p = String(row[0]).split("/");
-        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+        const rows = data.map(row => {
+          const p = String(row[0]).split("/");
+          const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+          const y1 = parseFloat(String(row[1]).replace(",", "."));
+          const y2 = parseFloat(String(row[2]).replace(",", "."));
+          return [d, Number.isFinite(y1) ? y1 : null, Number.isFinite(y2) ? y2 : null];
+        });
 
-        const y1p = parseFloat(String(row[1]).replace(",", "."));
-        const y2p = parseFloat(String(row[2]).replace(",", "."));
+        dt.addRows(rows);
 
-        const y1 = Number.isFinite(y1p) ? y1p : null;
-        const y2 = Number.isFinite(y2p) ? y2p : null;
+        // Cálculos de rangos para escalas manuales
+        const y1vals = rows.map(r => r[1]).filter(v => v !== null);
+        const y2vals = rows.map(r => r[2]).filter(v => v !== null);
 
-        return [d, y1, y2];
-      });
+        const y1min = Math.min(...y1vals);
+        const y1max = Math.max(...y1vals);
+        const y2min = Math.min(...y2vals);
+        const y2max = Math.max(...y2vals);
 
-      dt.addRows(rows);
+        // Margen del 10% para que los puntos no toquen los bordes
+        const y1margin = (y1max - y1min) * 0.1 || 5;
+        const y2margin = (y2max - y2min) * 0.1 || 5;
 
-      // Rangos por eje (solo valores válidos)
-      const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
-      const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
+        const options = {
+          backgroundColor: 'transparent',
+          legend: { position: "bottom" },
+          // Ajustamos 'right' a 80 para que quepa bien el texto del eje Y2
+          chartArea: { left: 80, right: 80, top: 40, bottom: 80 },
 
-      const y1min = y1vals.length ? Math.min(...y1vals) : 0;
-      const y1max = y1vals.length ? Math.max(...y1vals) : 1;
-
-      const y2min = y2vals.length ? Math.min(...y2vals) : 0;
-      const y2max = y2vals.length ? Math.max(...y2vals) : 1;
-
-      // margen solo para Y1; Y2 exacto (min/max reales)
-      const y1margin = Math.max((y1max - y1min) * 0.1, 1);
-
-      const options = {
-        backgroundColor: 'transparent',
-        legend: { position: "bottom" },
-
-        chartArea: { left: 70, right: 70, top: 30, bottom: 60 },
-
-        hAxis: {
-          title: header[0],
-          format: 'yyyy/MM/dd',
-          gridlines: { color: '#e5e7eb', count: 5 },
-          slantedText: false
-        },
-
-        vAxes: {
-          0: {
-            title: ejeY1,
-            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
-            gridlines: { color: '#e5e7eb' },
-            baselineColor: '#d1d5db'
+          hAxis: {
+            title: header[0],
+            format: 'yyyy/MM/dd',
+            gridlines: { color: '#f3f4f6' }
           },
-          1: {
-            title: ejeY2,
-            // ✅ EXACTO: min/max reales de Context
-            viewWindow: { min: y2min, max: y2max },
-            gridlines: { color: 'transparent' },
-            // ✅ quita la línea del 0 en el eje derecho
-            baselineColor: 'transparent'
-          }
-        },
 
-        // ComboChart para que el doble eje sea estable
-        seriesType: 'scatter',
-        series: {
-          // Performance: puntos azules
-          0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
-          // Context: puntos rojos
-          1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
-        },
+          vAxes: {
+            0: { 
+              title: ejeY1, 
+              viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
+              titleTextStyle: { color: '#2563eb', italic: false, bold: true },
+              textStyle: { color: '#2563eb' }
+            },
+            1: { 
+              title: ejeY2, 
+              viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
+              gridlines: { color: 'transparent' },
+              titleTextStyle: { color: '#ef4444', italic: false, bold: true },
+              textStyle: { color: '#ef4444' }
+            }
+          },
 
-        // Trendline SOLO para Performance (serie 0)
-        trendlines: {
-          0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.8, visibleInLegend: false }
-        },
+          seriesType: 'scatter',
+          series: {
+            0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 8 },
+            1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 8 }
+          },
 
-        tooltip: { trigger: 'both' }
-      };
+          trendlines: {
+            0: { 
+              type: 'linear', 
+              color: '#2563eb', 
+              lineWidth: 2, 
+              opacity: 0.4, 
+              visibleInLegend: false 
+            }
+          },
 
-      const chart = new google.visualization.ComboChart(document.getElementById("chart"));
-      chart.draw(dt, options);
+          tooltip: { trigger: 'focus' },
+          animation: { startup: true, duration: 1000, easing: 'out' }
+        };
+
+        const chart = new google.visualization.ComboChart(document.getElementById("chart"));
+        chart.draw(dt, options);
+
+      } catch (e) {
+        console.error("Error cargando datos:", e);
+        document.getElementById("chart").innerText = "Error al cargar los datos del script.";
+      }
     }
   </script>
 </body>
 </html>
-
-
 
 
 
