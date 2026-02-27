@@ -172,20 +172,20 @@ async function init() {
 
     vAxes: {
 
-      0: {
-        title: ejeY1,
-        viewWindow: {
-          min: y1min - (y1max-y1min)*0.1,
-          max: y1max + (y1max-y1min)*0.1
-        }
-      },
+  0: {
+    title: ejeY1,
+    viewWindow: {
+      min: y1min - (y1max - y1min) * 0.1,
+      max: y1max + (y1max - y1min) * 0.1
+    }
+  },
 
-      1: {
-        title: ejeY2,
-        viewWindow: {
-          min: y2min - (y2max-y2min)*0.1,
-          max: y2max + (y2max-y2min)*0.1
-        },
+  1: {
+    title: ejeY2,
+    viewWindow: {
+      min: y2min - (y2max - y2min) * 0.1,
+      max: y2max + (y2max - y2min) * 0.1
+    },
         gridlines: { color: 'transparent' }
       }
 
@@ -247,6 +247,7 @@ async function init() {
 
 </body>
 </html>
+
 
 
 
