@@ -78,7 +78,7 @@
 
     async function init() {
       const baseUrl =
-        "https://script.google.com/macros/s/AKfycbyCLpz6MLU4jdtMQyvl-U6BDRdEizV5E2cR7a65X2KMFwSlqMk1jvclGJSKEVATRVI/exec";
+        "https://script.google.com/macros/s/AKfycbx5EBWI0vhn_m1Kw9dgYRwmRfFTmugRHo6Z90LURvRisDRzvLY-UgKGUKwGwaLeElaP/exec";
 
       // rompe caché
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
@@ -93,7 +93,9 @@
       const header = Array.isArray(json.header) ? json.header : [];
       const data   = Array.isArray(json.data) ? json.data : [];
 
-      document.getElementById("subtitulo").innerText = json.subtitulo || "";
+      // ✅ subtítulo: usa Entrenamiento si existe; si no, mantiene subtitulo
+      document.getElementById("subtitulo").innerText =
+        (json.Entrenamiento ?? json.entrenamiento ?? json.subtitulo) || "";
 
       if (!data.length) {
         document.getElementById("chart").innerText = "Sin datos.";
@@ -113,6 +115,9 @@
       // Punto de color para títulos (●)
       const BLUE_DOT = " \u25CF";
       const RED_DOT  = " \u25CF";
+
+      // ✅ Detectar entrenamiento
+      const entrenamiento = String(json.Entrenamiento ?? json.entrenamiento ?? "").trim();
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
@@ -135,12 +140,23 @@
 
       dt.addRows(rows);
 
-      // rangos por eje
+      // rangos por eje (solo con valores finitos)
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
+      // Si falta alguno, evita Math.min/max con arrays vacíos
+      if (!y1vals.length) {
+        document.getElementById("chart").innerText = "Sin valores numéricos en Y1.";
+        return;
+      }
+      if (!y2vals.length) {
+        document.getElementById("chart").innerText = "Sin valores numéricos en Y2.";
+        return;
+      }
+
       const y1min = Math.min(...y1vals);
       const y1max = Math.max(...y1vals);
+
       const y2min = Math.min(...y2vals);
       const y2max = Math.max(...y2vals);
 
@@ -150,6 +166,12 @@
 
       const y1margin = y1range !== 0 ? y1range * 0.1 : (Math.abs(y1max) || 1) * 0.1;
       const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
+
+      // ✅ Si Entrenamiento == "Fuerza", el eje Y2 usa el mismo viewWindow que Y1
+      const y2ViewWindow =
+        (entrenamiento.toLowerCase() === "fuerza")
+          ? { min: y1min - y1margin, max: y1max + y1margin }
+          : { min: y2min - y2margin, max: y2max + y2margin };
 
       const options = {
         backgroundColor: 'transparent',
@@ -176,7 +198,7 @@
           },
           1: {
             title: ejeY2 + RED_DOT,
-            viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
+            viewWindow: y2ViewWindow,
             gridlines: { color: 'transparent' },
             baselineColor: 'transparent',
             titleTextStyle: { color: '#ef4444', italic: false }
@@ -204,7 +226,5 @@
   </script>
 </body>
 </html>
-
-
 
 
