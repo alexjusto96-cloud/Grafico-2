@@ -65,7 +65,6 @@
 <body>
   <div class="wrapper">
     <div class="card">
-      <!-- ✅ TÍTULO DINÁMICO -->
       <h1 id="tituloGrafico"></h1>
       <h2 id="subtitulo"></h2>
       <div id="chart"></div>
@@ -80,20 +79,17 @@
       const baseUrl =
         "https://script.google.com/macros/s/AKfycbx5EBWI0vhn_m1Kw9dgYRwmRfFTmugRHo6Z90LURvRisDRzvLY-UgKGUKwGwaLeElaP/exec";
 
-      // rompe caché
       const url = baseUrl + (baseUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
 
       const r = await fetch(url, { cache: "no-store" });
       const json = await r.json();
 
-      // ✅ NUEVO: título desde el JSON (C22). Fallback si viene vacío.
       document.getElementById("tituloGrafico").innerText =
         json.tituloGrafico || "Evolución del rendimiento";
 
       const header = Array.isArray(json.header) ? json.header : [];
       const data   = Array.isArray(json.data) ? json.data : [];
 
-      // ✅ subtítulo: usa Entrenamiento si existe; si no, mantiene subtitulo
       document.getElementById("subtitulo").innerText =
         (json.Entrenamiento ?? json.entrenamiento ?? json.subtitulo) || "";
 
@@ -108,16 +104,14 @@
         return;
       }
 
-      // Nombres de ejes (sin debug)
       const ejeY1 = json.ejeY  || header[1] || "Performance";
       const ejeY2 = json.ejeY2 || header[2] || "Context";
 
-      // Punto de color para títulos (●)
       const BLUE_DOT = " \u25CF";
       const RED_DOT  = " \u25CF";
 
-      // ✅ Detectar entrenamiento
       const entrenamiento = String(json.Entrenamiento ?? json.entrenamiento ?? "").trim();
+      const esFuerza = (entrenamiento.toLowerCase() === "fuerza");
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('date', header[0] || "Fecha");
@@ -125,7 +119,7 @@
       dt.addColumn('number', header[2] || "Context");
 
       const rows = data.map(row => {
-        const p = String(row[0]).split("/"); // "yyyy/MM/dd"
+        const p = String(row[0]).split("/");
         const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 
         const y1p = parseFloat(String(row[1]).replace(",", "."));
@@ -140,11 +134,9 @@
 
       dt.addRows(rows);
 
-      // rangos por eje (solo con valores finitos)
       const y1vals = rows.map(r => r[1]).filter(v => Number.isFinite(v));
       const y2vals = rows.map(r => r[2]).filter(v => Number.isFinite(v));
 
-      // Si falta alguno, evita Math.min/max con arrays vacíos
       if (!y1vals.length) {
         document.getElementById("chart").innerText = "Sin valores numéricos en Y1.";
         return;
@@ -160,25 +152,30 @@
       const y2min = Math.min(...y2vals);
       const y2max = Math.max(...y2vals);
 
-      // margen 10%
       const y1range = y1max - y1min;
       const y2range = y2max - y2min;
 
       const y1margin = y1range !== 0 ? y1range * 0.1 : (Math.abs(y1max) || 1) * 0.1;
       const y2margin = y2range !== 0 ? y2range * 0.1 : (Math.abs(y2max) || 1) * 0.1;
 
-      // ✅ Si Entrenamiento == "Fuerza", el eje Y2 usa el mismo viewWindow que Y1
-      const y2ViewWindow =
-        (entrenamiento.toLowerCase() === "fuerza")
-          ? { min: y1min - y1margin, max: y1max + y1margin }
-          : { min: y2min - y2margin, max: y2max + y2margin };
+      // ✅ NUEVO: si es Fuerza, el mínimo del/los ejes sale del mínimo global (Y1 vs Y2)
+      const globalMin = Math.min(y1min, y2min);
+
+      // viewWindow del eje 0 (Y1)
+      const y1ViewWindow = esFuerza
+        ? { min: globalMin - y1margin, max: y1max + y1margin }
+        : { min: y1min - y1margin,   max: y1max + y1margin };
+
+      // viewWindow del eje 1 (Y2)
+      // - si es Fuerza, ya lo estabas igualando a Y1; ahora también comparte el mínimo global
+      // - si no es Fuerza, se queda como estaba (y2min - 0.1*(y2max-y2min))
+      const y2ViewWindow = esFuerza
+        ? { min: globalMin - y1margin, max: y1max + y1margin }
+        : { min: y2min - y2margin,     max: y2max + y2margin };
 
       const options = {
         backgroundColor: 'transparent',
-
-        // ✅ quitar leyenda inferior
         legend: { position: "none" },
-
         chartArea: { left: 80, right: 80, top: 30, bottom: 60 },
 
         hAxis: {
@@ -191,7 +188,7 @@
         vAxes: {
           0: {
             title: ejeY1 + BLUE_DOT,
-            viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
+            viewWindow: y1ViewWindow,
             gridlines: { color: '#e5e7eb' },
             baselineColor: '#d1d5db',
             titleTextStyle: { color: '#2563eb', italic: false }
@@ -212,7 +209,6 @@
           1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
         },
 
-        // ✅ Trendline SOLO para Performance (serie 0)
         trendlines: {
           0: { type: 'linear', color: '#2563eb', lineWidth: 2, opacity: 0.85, visibleInLegend: false }
         },
