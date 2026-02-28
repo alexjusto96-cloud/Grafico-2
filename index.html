@@ -65,7 +65,8 @@
 <body>
   <div class="wrapper">
     <div class="card">
-      <h1>Evolución del rendimiento</h1>
+      <!-- ✅ TÍTULO DINÁMICO -->
+      <h1 id="tituloGrafico"></h1>
       <h2 id="subtitulo"></h2>
       <div id="chart"></div>
     </div>
@@ -84,6 +85,10 @@
 
       const r = await fetch(url, { cache: "no-store" });
       const json = await r.json();
+
+      // ✅ NUEVO: título desde el JSON (C22). Fallback si viene vacío.
+      document.getElementById("tituloGrafico").innerText =
+        json.tituloGrafico || "Evolución del rendimiento";
 
       const header = Array.isArray(json.header) ? json.header : [];
       const data   = Array.isArray(json.data) ? json.data : [];
@@ -163,7 +168,6 @@
 
         vAxes: {
           0: {
-            // ✅ texto + punto azul
             title: ejeY1 + BLUE_DOT,
             viewWindow: { min: y1min - y1margin, max: y1max + y1margin },
             gridlines: { color: '#e5e7eb' },
@@ -171,7 +175,6 @@
             titleTextStyle: { color: '#2563eb', italic: false }
           },
           1: {
-            // ✅ texto + punto rojo
             title: ejeY2 + RED_DOT,
             viewWindow: { min: y2min - y2margin, max: y2max + y2margin },
             gridlines: { color: 'transparent' },
@@ -183,9 +186,7 @@
         seriesType: 'scatter',
 
         series: {
-          // Performance: puntos azules
           0: { targetAxisIndex: 0, color: '#2563eb', pointSize: 7 },
-          // Context: puntos rojos
           1: { targetAxisIndex: 1, color: '#ef4444', pointSize: 7 }
         },
 
